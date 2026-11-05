@@ -22,3 +22,25 @@ class Task(models.Model):
 
     def __str__(self):
         return self.title
+
+class WorkflowTemplate(models.Model):
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name
+
+
+class WorkflowTask(models.Model):
+    template = models.ForeignKey(
+        WorkflowTemplate,
+        on_delete=models.CASCADE,
+        related_name='tasks'
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    days_after_start = models.PositiveIntegerField(default=0)
+    order = models.PositiveIntegerField(default=0)
+
+    def __str__(self):
+        return self.title
