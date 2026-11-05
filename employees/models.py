@@ -30,6 +30,29 @@ class WorkflowTemplate(models.Model):
     def __str__(self):
         return self.name
 
+class WorkflowAssignment(models.Model):
+    employee = models.ForeignKey(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name='workflow_assignments'
+    )
+    workflow = models.ForeignKey(
+        WorkflowTemplate,
+        on_delete=models.CASCADE,
+        related_name='assignments'
+    )
+    assigned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint( #makes this unique so that an employee cannot be assigned the same workflow multiple times
+                fields=['employee', 'workflow'],
+                name='unique_employee_workflow'
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.workflow.name} - {self.employee.name}"
 
 class WorkflowTask(models.Model):
     template = models.ForeignKey(

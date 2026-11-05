@@ -287,6 +287,12 @@ function App() {
         )
       );
 
+      setTasks((currentTasks) =>
+        currentTasks.filter(
+          (task) => task.employee !== employeeId
+        )
+      );
+
     } catch (error) {
       console.error("Error deleting employee:", error);
       alert(error.message);

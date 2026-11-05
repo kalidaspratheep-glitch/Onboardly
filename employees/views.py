@@ -4,10 +4,10 @@ from .models import Employee, Task
 from .serializers import EmployeeSerializer, TaskSerializer
 from django.shortcuts import get_object_or_404
 from datetime import timedelta
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.utils import timezone
 
-from .models import Employee, Task, WorkflowTemplate
+from .models import Employee, Task, WorkflowTemplate, WorkflowAssignment
 from .serializers import (
     EmployeeSerializer,
     TaskSerializer,
@@ -132,20 +132,41 @@ def apply_workflow(request, workflow_id):
     start_date = timezone.localdate()
     created_tasks = []
 
-    with transaction.atomic():
-        workflow_tasks = workflow.tasks.all().order_by('order', 'id')
+    workflow_tasks = list(
+        workflow.tasks.all().order_by('order', 'id')
+    )
 
-        for workflow_task in workflow_tasks:
-            task = Task.objects.create(
-                title=workflow_task.title,
-                description=workflow_task.description,
-                status="Pending",
-                due_date=start_date + timedelta(
-                    days=workflow_task.days_after_start
-                ),
-                employee=employee
+    if not workflow_tasks:
+        return Response(
+            {"error": "This workflow has no tasks."},
+            status=400
+        )
+
+    try:
+        with transaction.atomic():
+
+            WorkflowAssignment.objects.create(
+                employee=employee,
+                workflow=workflow
             )
-            created_tasks.append(task)
+
+            for workflow_task in workflow_tasks:
+                task = Task.objects.create(
+                    title=workflow_task.title,
+                    description=workflow_task.description,
+                    status="Pending",
+                    due_date=start_date + timedelta(
+                        days=workflow_task.days_after_start
+                    ),
+                    employee=employee
+                )
+                created_tasks.append(task)
+
+    except IntegrityError:
+        return Response(
+            {"error": "This workflow has already been assigned to this employee."},
+            status=409
+        )
 
     serializer = TaskSerializer(created_tasks, many=True)
     return Response(serializer.data, status=201)
