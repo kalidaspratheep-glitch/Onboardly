@@ -3,6 +3,16 @@ from rest_framework.response import Response
 from .models import Employee, Task
 from .serializers import EmployeeSerializer, TaskSerializer
 from django.shortcuts import get_object_or_404
+from datetime import timedelta
+from django.db import transaction
+from django.utils import timezone
+
+from .models import Employee, Task, WorkflowTemplate
+from .serializers import (
+    EmployeeSerializer,
+    TaskSerializer,
+    WorkflowTemplateSerializer,
+)
 
 #employee views
 @api_view(['GET', 'POST'])
@@ -90,3 +100,52 @@ def task_detail(request, id):
         return Response(serializer.data)
 
     return Response(serializer.errors, status=400)
+
+#workflow views
+@api_view(['GET'])
+def workflow_list(request):
+    workflows = WorkflowTemplate.objects.all()
+    serializer = WorkflowTemplateSerializer(workflows, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+def apply_workflow(request, workflow_id):
+    employee_id = request.data.get('employee_id')
+
+    if not employee_id:
+        return Response(
+            {"error": "employee_id is required"},
+            status=400
+        )
+
+    try:
+        employee = Employee.objects.get(pk=employee_id)
+    except (Employee.DoesNotExist, ValueError, TypeError):
+        return Response(
+            {"error": "Employee not found"},
+            status=404
+        )
+
+    workflow = get_object_or_404(WorkflowTemplate, pk=workflow_id)
+
+    start_date = timezone.localdate()
+    created_tasks = []
+
+    with transaction.atomic():
+        workflow_tasks = workflow.tasks.all().order_by('order', 'id')
+
+        for workflow_task in workflow_tasks:
+            task = Task.objects.create(
+                title=workflow_task.title,
+                description=workflow_task.description,
+                status="Pending",
+                due_date=start_date + timedelta(
+                    days=workflow_task.days_after_start
+                ),
+                employee=employee
+            )
+            created_tasks.append(task)
+
+    serializer = TaskSerializer(created_tasks, many=True)
+    return Response(serializer.data, status=201)

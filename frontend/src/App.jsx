@@ -28,6 +28,8 @@ function App() {
     taskFilter === "All"
       ? tasks
       : tasks.filter((task) => task.status === taskFilter);
+  const [workflows, setWorkflows] = useState([]);
+  const [selectedWorkflow, setSelectedWorkflow] = useState("");
 
   useEffect(() => {
     fetch("http://127.0.0.1:8000/api/employees/")
@@ -49,6 +51,14 @@ function App() {
       })
       .then((data) => setTasks(data))
       .catch((error) => console.error("Error fetching tasks:", error))
+
+    fetch("http://127.0.0.1:8000/api/workflows/")
+      .then((response) => {
+        if (!response.ok) throw new Error("Failed to fetch workflows");
+        return response.json();
+      })
+      .then((data) => setWorkflows(data))
+      .catch((error) => console.error("Error fetching workflows:", error));
   }, []);
 
   function closeEmployeeForm() {
@@ -59,6 +69,7 @@ function App() {
       email: "",
       department: "",
     });
+    setSelectedWorkflow("");
     setFormError("");
   }
 
@@ -100,6 +111,31 @@ function App() {
         );
       } else {
         setEmployees((currentEmployees) => [...currentEmployees, data]);
+
+        if (selectedWorkflow) {
+          const workflowResponse = await fetch(
+            `http://127.0.0.1:8000/api/workflows/${selectedWorkflow}/apply/`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                employee_id: data.id,
+              }),
+            }
+          );
+
+          if (!workflowResponse.ok) {
+            throw new Error(
+              "Employee created, but workflow could not be applied."
+            );
+          }
+
+          const newTasks = await workflowResponse.json();
+
+          setTasks((currentTasks) => [...currentTasks, ...newTasks]);
+        }
       }
 
       closeEmployeeForm();
@@ -405,6 +441,26 @@ function App() {
                   required
                 />
               </div>
+
+              {!editingEmployee && (
+                <div className="form-field">
+                  <label htmlFor="employee-workflow">Onboarding Workflow (Optional)</label>
+
+                  <select
+                    id="employee-workflow"
+                    value={selectedWorkflow}
+                    onChange={(event) => setSelectedWorkflow(event.target.value)}
+                  >
+                    <option value="">No workflow</option>
+
+                    {workflows.map((workflow) => (
+                      <option key={workflow.id} value={workflow.id}>
+                        {workflow.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {formError && <p className="error-message">{formError}</p>}
 
