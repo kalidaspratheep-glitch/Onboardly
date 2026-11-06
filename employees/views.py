@@ -7,7 +7,7 @@ from datetime import timedelta
 from django.db import transaction, IntegrityError
 from django.utils import timezone
 
-from .models import Employee, Task, WorkflowTemplate, WorkflowAssignment
+from .models import Employee, Task, WorkflowTemplate, WorkflowTask, WorkflowAssignment
 from .serializers import (
     EmployeeSerializer,
     TaskSerializer,
@@ -102,11 +102,98 @@ def task_detail(request, id):
     return Response(serializer.errors, status=400)
 
 #workflow views
-@api_view(['GET'])
+@api_view(['GET', 'POST'])
 def workflow_list(request):
-    workflows = WorkflowTemplate.objects.all()
-    serializer = WorkflowTemplateSerializer(workflows, many=True)
-    return Response(serializer.data)
+    if request.method == 'GET':
+        workflows = WorkflowTemplate.objects.all()
+        serializer = WorkflowTemplateSerializer(workflows, many=True)
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        name = request.data.get('name', '')
+        description = request.data.get('description', '')
+
+        if not isinstance(name, str) or not name.strip():
+            return Response(
+                {"error": "Workflow name is required."},
+                status=400
+            )
+
+        if not isinstance(description, str):
+            return Response(
+                {"error": "Workflow description must be text."},
+                status=400
+            )
+
+        name = name.strip()
+
+        description = description.strip()
+        tasks = request.data.get('tasks', [])
+
+        if not isinstance(tasks, list) or not tasks:
+            return Response(
+                {"error": "At least one task is required."},
+                status=400
+            )
+
+        # Validate all tasks before saving anything.
+        validated_tasks = []
+
+        for index, task in enumerate(tasks):
+            if not isinstance(task, dict):
+                return Response(
+                    {"error": f"Task {index + 1} is invalid."},
+                    status=400
+                )
+
+            title = task.get('title', '')
+            task_description = task.get('description', '')
+            days_after_start = task.get('days_after_start', 0)
+
+            if not isinstance(title, str) or not title.strip():
+                return Response(
+                    {"error": f"Task {index + 1} needs a title."},
+                    status=400
+                )
+
+            if not isinstance(task_description, str):
+                return Response(
+                    {"error": f"Description for task {index + 1} is invalid."},
+                    status=400
+                )
+
+            if (
+                isinstance(days_after_start, bool)
+                or not isinstance(days_after_start, int)
+                or days_after_start < 0
+            ):
+                return Response(
+                    {"error": f"Days after start for task {index + 1} must be a non-negative integer."},
+                    status=400
+                )
+
+            validated_tasks.append({
+                "title": title.strip(),
+                "description": task_description.strip(),
+                "days_after_start": days_after_start,
+                "order": index,
+            })
+
+        # Create the template and its tasks together.
+        with transaction.atomic():
+            workflow = WorkflowTemplate.objects.create(
+                name=name,
+                description=description
+            )
+
+            for task_data in validated_tasks:
+                WorkflowTask.objects.create(
+                    template=workflow,
+                    **task_data
+                )
+
+        serializer = WorkflowTemplateSerializer(workflow)
+        return Response(serializer.data, status=201)
 
 
 @api_view(['POST'])
