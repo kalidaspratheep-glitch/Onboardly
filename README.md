@@ -29,6 +29,7 @@ A full-stack employee onboarding platform built to simplify employee management,
 - View employee and task statistics.
 - Track individual employee onboarding progress.
 - Monitor completed, pending, and overdue tasks.
+- Navigate between employee, task, and workflow management sections.
 
 ### Backend and Data Integrity
 - RESTful APIs built with Django REST Framework.
@@ -54,7 +55,7 @@ A full-stack employee onboarding platform built to simplify employee management,
 
 - Python 3.12+
 - Node.js and npm
-- PostgreSQL 18+
+- PostgreSQL
 
 ### 1. Clone the repository
 
@@ -95,7 +96,18 @@ Create and activate a virtual environment:
 
 ```bash
 python -m venv .venv
+```
+
+On Windows (Git Bash / MSYS2):
+
+```bash
 source .venv/Scripts/activate
+```
+
+On macOS / Linux:
+
+```bash
+source .venv/bin/activate
 ```
 
 Install dependencies:
@@ -172,7 +184,7 @@ From the project root:
 python manage.py test employees
 ```
 
-The test suite uses a separate temporary database and verifies the core employee, task, and workflow API functionality.
+The test suite uses a separate temporary database and verifies core employee, task, and workflow API functionality.
 
 For PostgreSQL testing, the database user must have permission to create databases:
 
@@ -200,7 +212,7 @@ ALTER ROLE onboardly_user CREATEDB;
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/workflows/` | List workflow templates with their task definitions |
+| GET, POST | `/api/workflows/` | List or create workflow templates |
 | POST | `/api/workflows/<workflow_id>/apply/` | Apply a workflow to an employee and generate tasks |
 
 ## Project Structure
@@ -220,9 +232,15 @@ Onboardly/
 │   └── tests.py
 ├── frontend/
 │   ├── src/
+│   │   ├── components/
+│   │   │   └── Sidebar.jsx
+│   │   ├── pages/
+│   │   │   ├── Dashboard.jsx
+│   │   │   └── Workflows.jsx
 │   │   ├── App.jsx
 │   │   ├── App.css
-│   │   └── ...
+│   │   ├── index.css
+│   │   └── main.jsx
 │   ├── package.json
 │   └── ...
 ├── .gitignore
